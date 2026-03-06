@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Game</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 16px;
+      color: #e0c97f;
+      letter-spacing: 2px;
+    }
+
+    /* ── Scoreboard ─────────────────────────────────── */
+    #scoreboard {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+
+    .team-box {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 12px;
+      padding: 12px 28px;
+      text-align: center;
+      min-width: 150px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .team-box.active {
+      border-color: #e0c97f;
+      box-shadow: 0 0 18px #e0c97f88;
+    }
+
+    .team-box .team-name {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .team-box .score {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #e0c97f;
+    }
+
+    #turn-info {
+      font-size: 1rem;
+      color: #aaa;
+      text-align: center;
+      min-height: 24px;
+    }
+
+    /* ── Grid wrapper (labels + grid) ───────────────── */
+    #grid-wrapper {
+      display: grid;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .col-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #e0c97f;
+      font-size: 1rem;
+      grid-row: 1;
+    }
+
+    .row-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #e0c97f;
+      font-size: 1rem;
+      grid-column: 1;
+    }
+
+    /* ── Cards ──────────────────────────────────────── */
+    .card-cell {
+      width: 110px;
+      height: 110px;
+      perspective: 700px;
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.5s;
+      cursor: pointer;
+    }
+
+    .card.flipped   { transform: rotateY(180deg); }
+    .card.matched   { transform: rotateY(180deg); cursor: default; }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .card-back {
+      background: linear-gradient(135deg, #0f3460, #533483);
+      border: 2px solid #533483;
+      font-size: 2rem;
+    }
+
+    .card-back::after {
+      content: '?';
+      color: #e0c97f;
+      font-size: 2.4rem;
+      font-weight: bold;
+    }
+
+    .card-front {
+      background: #16213e;
+      border: 2px solid #e0c97f44;
+      transform: rotateY(180deg);
+    }
+
+    .card-front img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+
+    .card.matched .card-front {
+      border-color: #4caf50;
+      box-shadow: 0 0 12px #4caf5099;
+    }
+
+    /* ── Controls ───────────────────────────────────── */
+    #controls {
+      display: flex;
+      gap: 16px;
+      margin-top: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: bold;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+
+    #btn-restart  { background: #e0c97f; color: #1a1a2e; }
+    #btn-team-names { background: #533483; color: #fff; }
+
+    /* ── Team name modal ─────────────────────────────── */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000a;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+
+    #modal {
+      background: #16213e;
+      border: 2px solid #e0c97f;
+      border-radius: 16px;
+      padding: 32px 40px;
+      min-width: 320px;
+      text-align: center;
+    }
+
+    #modal h2 { margin-bottom: 20px; color: #e0c97f; }
+
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+      margin-bottom: 14px;
+    }
+
+    .modal-field label { font-size: 0.9rem; color: #aaa; margin-bottom: 4px; }
+
+    .modal-field input {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #533483;
+      background: #1a1a2e;
+      color: #eee;
+      font-size: 1rem;
+    }
+
+    #modal-save {
+      background: #e0c97f;
+      color: #1a1a2e;
+      margin-top: 10px;
+      width: 100%;
+      padding: 12px;
+    }
+
+    /* ── Notification banner ─────────────────────────── */
+    #notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #e0c97f;
+      color: #1a1a2e;
+      font-weight: bold;
+      font-size: 1.1rem;
+      padding: 12px 32px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px #0008;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s;
+      z-index: 200;
+    }
+    #notification.show { opacity: 1; }
+
+    /* ── Setup screen ────────────────────────────────── */
+    #setup-screen {
+      position: fixed;
+      inset: 0;
+      background: #1a1a2e;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+    }
+
+    #setup-screen h2 { color: #e0c97f; font-size: 1.8rem; }
+    #setup-screen p  { color: #aaa; max-width: 420px; text-align: center; }
+
+    #pair-count-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #eee;
+      font-size: 1rem;
+    }
+
+    #pair-count {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid #533483;
+      background: #16213e;
+      color: #eee;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    #image-list-input {
+      width: 340px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #533483;
+      background: #16213e;
+      color: #eee;
+      font-size: 0.95rem;
+    }
+
+    #btn-load-images {
+      background: #e0c97f;
+      color: #1a1a2e;
+      padding: 12px 36px;
+      font-size: 1.1rem;
+    }
+
+    #setup-error { color: #f44; font-size: 0.9rem; min-height: 20px; }
+
+    #file-input { display: none; }
+
+    #btn-pick-folder {
+      background: #533483;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Setup screen ──────────────────────────────────── -->
+<div id="setup-screen">
+  <h2>Memory Game — Image Setup</h2>
+  <p>Select the number of pairs, then pick your images (one per pair).</p>
+
+  <div id="pair-count-wrap">
+    <label for="pair-count">Number of pairs:</label>
+    <select id="pair-count">
+      <option value="4">4 pairs (2 × 4 grid)</option>
+      <option value="6">6 pairs (3 × 4 grid)</option>
+      <option value="8">8 pairs (4 × 4 grid)</option>
+      <option value="10">10 pairs (5 × 4 grid)</option>
+      <option value="12" selected>12 pairs (6 × 4 grid)</option>
+      <option value="15">15 pairs (6 × 5 grid)</option>
+    </select>
+  </div>
+
+  <input type="file" id="file-input" multiple accept="image/*" />
+  <button id="btn-pick-folder" onclick="document.getElementById('file-input').click()">
+    Pick Images
+  </button>
+
+  <p style="color:#aaa; font-size:0.85rem;">
+    — or paste a comma-separated list of image URLs / paths —
+  </p>
+  <textarea id="image-list-input" rows="3"
+    placeholder="https://example.com/img1.png, ./images/cat.jpg, ..."></textarea>
+
+  <button id="btn-load-images">Load &amp; Start Game</button>
+  <div id="setup-error"></div>
+</div>
+
+<!-- ── Main game ─────────────────────────────────────── -->
+<h1>Memory Game</h1>
+
+<div id="scoreboard">
+  <div class="team-box active" id="team1-box">
+    <div class="team-name" id="team1-name">Team 1</div>
+    <div class="score" id="team1-score">0</div>
+  </div>
+  <div style="text-align:center">
+    <div id="turn-info">Team 1's turn</div>
+  </div>
+  <div class="team-box" id="team2-box">
+    <div class="team-name" id="team2-name">Team 2</div>
+    <div class="score" id="team2-score">0</div>
+  </div>
+</div>
+
+<div id="grid-wrapper"></div>
+
+<div id="controls">
+  <button id="btn-team-names">Edit Team Names</button>
+  <button id="btn-restart">Restart Game</button>
+</div>
+
+<!-- ── Team name modal ───────────────────────────────── -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2>Team Names</h2>
+    <div class="modal-field">
+      <label>Team 1</label>
+      <input id="input-team1" type="text" value="Team 1" />
+    </div>
+    <div class="modal-field">
+      <label>Team 2</label>
+      <input id="input-team2" type="text" value="Team 2" />
+    </div>
+    <button id="modal-save">Save</button>
+  </div>
+</div>
+
+<!-- ── Notification ──────────────────────────────────── -->
+<div id="notification"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────
+const ALL_COL_LETTERS = ['A','B','C','D','E','F'];
+let ROW_NUMBERS = ['1','2','3','4'];
+
+let numPairs    = 12;
+let COLS        = 6;
+let ROWS        = 4;
+let TOTAL       = 24;
+let COL_LETTERS = ALL_COL_LETTERS.slice(0, COLS);
+
+let images      = [];   // image URLs (one per pair)
+let cards       = [];   // shuffled array of TOTAL {id, src, matched, flipped}
+let flipped     = [];   // up to 2 currently face-up unmatched cards
+let locked      = false;
+let currentTeam = 0;    // 0 = team1, 1 = team2
+let scores      = [0, 0];
+let teamNames   = ['Team 1', 'Team 2'];
+
+// ── Setup screen ─────────────────────────────────────────
+const fileInput     = document.getElementById('file-input');
+const btnLoad       = document.getElementById('btn-load-images');
+const imageListInput = document.getElementById('image-list-input');
+const setupError    = document.getElementById('setup-error');
+const setupScreen   = document.getElementById('setup-screen');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length > 0) {
+    const urls = Array.from(fileInput.files).map(f => URL.createObjectURL(f));
+    imageListInput.value = ''; // clear text input
+    tryStartGame(urls);
+  }
+});
+
+btnLoad.addEventListener('click', () => {
+  if (fileInput.files.length > 0) {
+    const urls = Array.from(fileInput.files).map(f => URL.createObjectURL(f));
+    tryStartGame(urls);
+  } else {
+    const raw = imageListInput.value.trim();
+    if (!raw) { setupError.textContent = 'Paste image paths or pick files.'; return; }
+    const urls = raw.split(',').map(s => s.trim()).filter(Boolean);
+    tryStartGame(urls);
+  }
+});
+
+function tryStartGame(urls) {
+  numPairs = parseInt(document.getElementById('pair-count').value, 10);
+  if (urls.length < numPairs) {
+    setupError.textContent = `Need at least ${numPairs} images — you provided ${urls.length}.`;
+    return;
+  }
+  images = urls.slice(0, numPairs);
+  setupError.textContent = '';
+  setupScreen.style.display = 'none';
+  initGame();
+}
+
+// ── Grid dimension helper ──────────────────────────────────
+// Prefer 4 rows; fall back to other row counts keeping cols ≤ 6
+function getGridDims(pairs) {
+  const total = pairs * 2;
+  if (total % 4 === 0 && total / 4 <= 6) return { cols: total / 4, rows: 4 };
+  for (let rows = 3; rows <= 6; rows++) {
+    if (total % rows === 0 && total / rows <= 6) return { cols: total / rows, rows };
+  }
+  return { cols: total, rows: 1 };
+}
+
+// ── Game init ─────────────────────────────────────────────
+function initGame() {
+  flipped     = [];
+  locked      = false;
+  currentTeam = 0;
+  scores      = [0, 0];
+
+  // Compute grid dimensions
+  const dims  = getGridDims(numPairs);
+  COLS        = dims.cols;
+  ROWS        = dims.rows;
+  TOTAL       = numPairs * 2;
+  COL_LETTERS = ALL_COL_LETTERS.slice(0, COLS);
+  ROW_NUMBERS = Array.from({ length: ROWS }, (_, i) => String(i + 1));
+
+  // Build deck (each image twice)
+  const deck = [];
+  images.forEach((src, i) => {
+    deck.push({ id: i * 2,     pairId: i, src });
+    deck.push({ id: i * 2 + 1, pairId: i, src });
+  });
+  shuffle(deck);
+  cards = deck.map(c => ({ ...c, matched: false, flipped: false }));
+
+  renderScoreboard();
+  renderGrid();
+}
+
+// ── Rendering ─────────────────────────────────────────────
+function renderGrid() {
+  const wrapper = document.getElementById('grid-wrapper');
+  wrapper.innerHTML = '';
+  wrapper.style.gridTemplateColumns = `32px repeat(${COLS}, 1fr)`;
+  wrapper.style.gridTemplateRows    = `28px repeat(${ROWS}, 1fr)`;
+
+  // column letter labels (row 1 of grid, cols 2-7)
+  // first cell is the corner (empty)
+  const corner = document.createElement('div');
+  corner.style.gridRow = '1';
+  corner.style.gridColumn = '1';
+  wrapper.appendChild(corner);
+
+  COL_LETTERS.forEach((letter, ci) => {
+    const lbl = document.createElement('div');
+    lbl.className = 'col-label';
+    lbl.style.gridRow = '1';
+    lbl.style.gridColumn = ci + 2;
+    lbl.textContent = letter;
+    wrapper.appendChild(lbl);
+  });
+
+  // rows
+  for (let r = 0; r < ROWS; r++) {
+    // row number label
+    const rl = document.createElement('div');
+    rl.className = 'row-label';
+    rl.style.gridRow = r + 2;
+    rl.style.gridColumn = '1';
+    rl.textContent = ROW_NUMBERS[r];
+    wrapper.appendChild(rl);
+
+    for (let c = 0; c < COLS; c++) {
+      const idx = r * COLS + c;
+      const data = cards[idx];
+
+      const cell = document.createElement('div');
+      cell.className = 'card-cell';
+      cell.style.gridRow = r + 2;
+      cell.style.gridColumn = c + 2;
+
+      const card = document.createElement('div');
+      card.className = 'card' +
+        (data.flipped  ? ' flipped' : '') +
+        (data.matched  ? ' matched' : '');
+      card.dataset.index = idx;
+      card.addEventListener('click', onCardClick);
+
+      const back  = document.createElement('div');
+      back.className = 'card-face card-back';
+
+      const front = document.createElement('div');
+      front.className = 'card-face card-front';
+      const img = document.createElement('img');
+      img.src = data.src;
+      img.alt = `Card ${COL_LETTERS[c]}${ROW_NUMBERS[r]}`;
+      front.appendChild(img);
+
+      card.appendChild(back);
+      card.appendChild(front);
+      cell.appendChild(card);
+      wrapper.appendChild(cell);
+    }
+  }
+}
+
+function renderScoreboard() {
+  document.getElementById('team1-name').textContent  = teamNames[0];
+  document.getElementById('team2-name').textContent  = teamNames[1];
+  document.getElementById('team1-score').textContent = scores[0];
+  document.getElementById('team2-score').textContent = scores[1];
+  document.getElementById('team1-box').classList.toggle('active', currentTeam === 0);
+  document.getElementById('team2-box').classList.toggle('active', currentTeam === 1);
+  document.getElementById('turn-info').textContent =
+    scores[0] + scores[1] < numPairs
+      ? `${teamNames[currentTeam]}'s turn`
+      : gameOverText();
+}
+
+function gameOverText() {
+  if (scores[0] > scores[1]) return `${teamNames[0]} wins! 🎉`;
+  if (scores[1] > scores[0]) return `${teamNames[1]} wins! 🎉`;
+  return "It's a tie!";
+}
+
+// ── Card click ────────────────────────────────────────────
+function onCardClick(e) {
+  if (locked) return;
+  const idx  = +e.currentTarget.dataset.index;
+  const data = cards[idx];
+  if (data.matched || data.flipped) return;
+  if (flipped.length === 2) return;
+
+  // Flip card
+  data.flipped = true;
+  e.currentTarget.classList.add('flipped');
+  flipped.push(idx);
+
+  if (flipped.length === 2) {
+    locked = true;
+    checkMatch();
+  }
+}
+
+function checkMatch() {
+  const [i1, i2] = flipped;
+  const c1 = cards[i1];
+  const c2 = cards[i2];
+
+  if (c1.pairId === c2.pairId) {
+    // Match!
+    c1.matched = c2.matched = true;
+    scores[currentTeam]++;
+    notify(`${teamNames[currentTeam]} found a match! +1`);
+    markMatched(i1, i2);
+    flipped = [];
+    locked  = false;
+    renderScoreboard();
+
+    if (scores[0] + scores[1] === numPairs) {
+      setTimeout(() => notify(gameOverText(), 4000), 600);
+    }
+  } else {
+    // No match — flip back after delay, switch team
+    setTimeout(() => {
+      unflipCard(i1);
+      unflipCard(i2);
+      c1.flipped = c2.flipped = false;
+      flipped = [];
+      currentTeam = 1 - currentTeam;
+      locked  = false;
+      renderScoreboard();
+    }, 1200);
+  }
+}
+
+function markMatched(i1, i2) {
+  [i1, i2].forEach(idx => {
+    const el = document.querySelector(`.card[data-index="${idx}"]`);
+    if (el) el.classList.add('matched');
+  });
+}
+
+function unflipCard(idx) {
+  const el = document.querySelector(`.card[data-index="${idx}"]`);
+  if (el) el.classList.remove('flipped');
+}
+
+// ── Notification ──────────────────────────────────────────
+let notifTimer = null;
+function notify(msg, duration = 2000) {
+  const el = document.getElementById('notification');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (notifTimer) clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ── Team name modal ───────────────────────────────────────
+document.getElementById('btn-team-names').addEventListener('click', () => {
+  document.getElementById('input-team1').value = teamNames[0];
+  document.getElementById('input-team2').value = teamNames[1];
+  document.getElementById('modal-overlay').classList.add('open');
+});
+
+document.getElementById('modal-save').addEventListener('click', () => {
+  teamNames[0] = document.getElementById('input-team1').value.trim() || 'Team 1';
+  teamNames[1] = document.getElementById('input-team2').value.trim() || 'Team 2';
+  document.getElementById('modal-overlay').classList.remove('open');
+  renderScoreboard();
+});
+
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+});
+
+// ── Restart ───────────────────────────────────────────────
+document.getElementById('btn-restart').addEventListener('click', () => {
+  if (images.length === 0) return;
+  initGame();
+});
+
+// ── Utility ───────────────────────────────────────────────
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+</script>
+</body>
+</html>
