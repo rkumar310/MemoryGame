@@ -4,10 +4,7 @@ A two-player browser-based memory card matching game. Players take turns flippin
 
 ## How to Run
 
-No installation required. Open `index.html` directly in a browser:
-
-- **Windows:** Double-click `index.html` in File Explorer
-- **Linux/Mac:** `xdg-open index.html` or drag the file into a browser
+Use a local server to start playing
 - **Local server (recommended if using file paths):**
   ```bash
   python3 -m http.server 8080
